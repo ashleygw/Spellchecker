@@ -10,6 +10,7 @@
 #include <fstream>
 #include <cctype>
 #include <algorithm>
+#include "Hash.h"
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 using namespace std;
@@ -32,20 +33,18 @@ size_t distance(string string1, size_t lenstring1, string string2, size_t lenstr
 	{
 		for (i = 1; i <= lenstring2; i++)
 		{
-			temp = MIN((wizard[i - 1][j] + 1), (wizard[i][j - 1] + 1));
-			wizard[i][j] = MIN(temp, (wizard[i - 1][j - 1] + (string1[i - 1] == string2[j - 1] ? 0 : 1)));
+			wizard[i][j] = MIN(MIN((wizard[i - 1][j] + 1), (wizard[i][j - 1] + 1)), (wizard[i - 1][j - 1] + (string2[i - 1] == string1[j - 1] ? 0 : 1)));
+			/*if (i > 1 && j > 1 && string2[i] == string1[j - 1] && string2[i - 1] == string1[j]) 
+			{
+				wizard[i][j] = MIN(wizard[i][j], wizard[i - 2][ j - 2] + 1);
+			}*/
 		}
 	}
 	return wizard[lenstring2][lenstring1];
 }
 
-string to_lowercase(string input, size_t len) {
-	for (int i = 0; i < len; i++)
-	{
-		if (input[i] <= 'Z' && input[i] >= 'A')
-			input[i] -= ('Z' - 'z');
-	}
-	return input;
+void to_lowercase(string &input) {
+	transform(input.begin(), input.end(), input.begin(), ::tolower);
 }
 
 //http://www.cplusplus.com/reference/unordered_map/unordered_map/begin/
@@ -71,7 +70,7 @@ vector<string> generate_n_candidates(string input, size_t len, unordered_map<str
 	//considering why I wouldn't always use this method. Iterating over the entire hash is really fast.
 	// TODO, consider making this recursive as well, insert this list for bigger numbers, rebuild 
 	// using the below method for when go <= 2.
-	if (/*go >= 3*/1)
+	if (go >= 3)
 	{
 		for (auto i = words.begin(); i != words.end(); ++i) {
 			if (distance(input, len, i->first, i->first.length()) == go)
@@ -228,8 +227,18 @@ unordered_map<string, unsigned> generate_candidates(string input, size_t &len, u
 	return ret;
 }
 
+template<typename T>
+class superfasthash {
+public:
+	unsigned operator()(const T& value)
+	{
+		return 0;
+	}
+};
+
 int main()
 {
+	Hash h(198347);
 	unordered_map<string, string> words;
 	unordered_map<string, unsigned> candidates;
 	vector<string> double_candidates;
@@ -239,7 +248,7 @@ int main()
 	string desired_distance;
 	ifstream ifs;
 
-	ifs.open("allwords.txt", ifstream::in);
+	ifs.open("american-english", ifstream::in);
 	if (!ifs)
 	{
 		cout << "Dictionary File not Loaded. " << endl;
@@ -250,33 +259,38 @@ int main()
 		words[temp] = temp;
 	}
 	//ifs.close();
+
 	while (1) {
+		double_candidates.clear();
 		cout << "Enter a word: ";
 		getline(cin, string1);
 		if (string1.length() == 0)
 			exit(0);
 		lenstring1 = string1.length();
-		string1 = to_lowercase(string1, lenstring1);
+		to_lowercase(string1);
 		if (words.find(string1) != words.end())
 			cout << string1 << " is a valid word." << endl;
 		else
-		{ 
-			cout << "Enter desired distance: " << endl;
-			getline(cin, desired_distance);
-			cout << "Two edit suggestions: " << endl;
-			double_candidates = generate_n_candidates((string)string1, lenstring1, words, stoi(desired_distance));
+		{
+			double_candidates = generate_n_candidates(string1, lenstring1, words, 1);
+			if (double_candidates.empty())
+			{
+				//cout << "1 empty" << endl;
+				double_candidates = generate_n_candidates(string1, lenstring1, words, 2);
+				if (double_candidates.empty())
+				{
+					//cout << "2 empty" << endl;
+					double_candidates = generate_n_candidates(string1, lenstring1, words, 3);
+				}
+				if (double_candidates.empty()) {
+					cout << "No suitable suggestions..." << endl;
+					continue;
+				}
+			}
+			cout << "Suggestions: " << endl;
+
 			for (int q = 0; q < double_candidates.size(); q++)
 				cout << double_candidates[q] << endl;
-			cout << string1 << " is not valid." << endl;
-			candidates = generate_candidates(string1, lenstring1, words);
-			if (candidates.empty()) {
-				cout << "There were no suitable one-edit suggestions. " << endl;
-			}
-			else {
-				cout << "Suggestions: " << endl;
-				print_map(candidates);
-			}
 		}
-		//std::cout << distance(string1, lenstring1, string2, lenstring2) << std::endl;
 	}
 }
